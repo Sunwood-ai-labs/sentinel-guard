@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 240" width="960" height="240" fill="none">
+  <rect width="960" height="240" rx="16" fill="#141415"/>
+  <rect x="0.75" y="0.75" width="958.5" height="238.5" rx="15.25" stroke="#2a2a2e" stroke-width="1.5"/>
+
+  <!-- Subtle concentric aperture rings on the right -->
+  <circle cx="810" cy="120" r="138" stroke="#222226" stroke-width="1.5"/>
+  <circle cx="810" cy="120" r="106" stroke="#26262b" stroke-width="1.5"/>
+  <circle cx="810" cy="120" r="74" stroke="#2c2c32" stroke-width="1.5"/>
+  <circle cx="810" cy="120" r="42" stroke="#e5a93c" stroke-opacity="0.45" stroke-width="1.5"/>
+  <circle cx="810" cy="120" r="8" fill="#e5a93c"/>
+
+  <!-- Flat geometric shield + aperture mark -->
+  <rect x="56" y="64" width="64" height="64" rx="14" fill="#19191b" stroke="#2e2e33" stroke-width="1.5"/>
+  <path d="M88 78L103 84.5V95.5C103 105.2 96.6 112.8 88 115.5C79.4 112.8 73 105.2 73 95.5V84.5L88 78Z" stroke="#ededed" stroke-width="2.4" stroke-linejoin="round"/>
+  <circle cx="88" cy="95" r="7" stroke="#e5a93c" stroke-width="2"/>
+  <circle cx="88" cy="95" r="2.3" fill="#e5a93c"/>
+
+  <!-- Title & subtitle -->
+  <text x="142" y="96" fill="#ededed" font-family="Inter, Segoe UI, sans-serif" font-size="34" font-weight="600" letter-spacing="-0.02em">Sentinel Guard</text>
+  <text x="142" y="124" fill="#a1a1a6" font-family="Inter, Segoe UI, sans-serif" font-size="15" font-weight="400">Local-first Windows telemetry &amp; cross-tool credential access monitor</text>
+
+  <!-- Quiet status strip -->
+  <circle cx="62" cy="176" r="4" fill="#4cc38a"/>
+  <text x="74" y="180" fill="#a1a1a6" font-family="Consolas, monospace" font-size="12.5">Tauri 2  ·  Rust SIMD Scanner  ·  Live TCP Watch  ·  Zero External Telemetry</text>
+</svg>
