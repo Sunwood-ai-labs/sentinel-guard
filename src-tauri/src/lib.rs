@@ -10,6 +10,11 @@ use tauri::{Manager, WindowEvent};
 use crate::models::{ActionResult, LiveSnapshot, ScanReport};
 
 #[tauri::command]
+fn get_initial_locale() -> Option<String> {
+    std::env::var("SENTINEL_GUARD_LANG").ok()
+}
+
+#[tauri::command]
 async fn scan_apps(custom_roots: Option<Vec<String>>) -> Result<ScanReport, String> {
     tauri::async_runtime::spawn_blocking(move || scanner::scan_installed_apps(custom_roots))
         .await
@@ -99,6 +104,7 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            get_initial_locale,
             scan_apps,
             get_live_snapshot,
             apply_env_opt_out,

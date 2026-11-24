@@ -15,6 +15,12 @@ use crate::models::{
 const MAX_SCAN_FILE_BYTES: u64 = 350 * 1024 * 1024; // 350 MB (supports large server.asar)
 
 pub fn default_scan_roots() -> Vec<PathBuf> {
+    if let Ok(override_root) = std::env::var("SENTINEL_GUARD_SCAN_ROOT") {
+        let p = PathBuf::from(override_root.trim());
+        if p.exists() {
+            return vec![p];
+        }
+    }
     let mut roots = Vec::new();
     if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
         let programs = PathBuf::from(&local_app_data).join("Programs");

@@ -24,3 +24,7 @@ features:
   - title: Live TCP Watch & One-Click Block
     details: Matches active HTTPS/OTLP connections by process name and PID without admin rights, and applies HKCU env opt-outs or UAC hosts blocks in one click.
 ---
+
+<div style="margin-top: 32px; text-align: center;">
+  <img src="/screenshot-en.png" alt="Sentinel Guard English UI" style="border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); max-width: 100%;" />
+</div>

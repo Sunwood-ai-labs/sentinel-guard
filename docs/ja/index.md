@@ -24,3 +24,7 @@ features:
   - title: ライブ監視＆ワンクリック対策
     details: 標準ユーザー権限のままアクティブ TCP 接続をプロセス単位で照合し、オプトアウト環境変数設定や UAC 付き hosts ブロックを 1 クリックで実行できます。
 ---
+
+<div style="margin-top: 32px; text-align: center;">
+  <img src="/screenshot-ja.png" alt="Sentinel Guard 日本語 UI" style="border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); max-width: 100%;" />
+</div>

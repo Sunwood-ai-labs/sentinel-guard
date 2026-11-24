@@ -24,6 +24,10 @@
 
 ## ✨ 概要
 
+<p align="center">
+  <img src="docs/public/screenshot-ja.png" alt="Sentinel Guard 日本語 UI スクリーンショット" width="900" />
+</p>
+
 **Sentinel Guard** は、**Tauri 2 + Rust + React** で構築された軽量な Windows デスクトップ監視アプリです。インストール済みの Electron アプリや開発ツールを解析し、以下を可視化・遮断します。
 
 - **隠れテレメトリ送信先**（PostHog / Axiom OTLP / Sentry / Segment / Mixpanel / Amplitude / Datadog / `ingest.*` / `telemetry.*` 等）

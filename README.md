@@ -24,6 +24,10 @@
 
 ## ✨ Overview
 
+<p align="center">
+  <img src="docs/public/screenshot-en.png" alt="Sentinel Guard English UI Screenshot" width="900" />
+</p>
+
 **Sentinel Guard** is a lightweight Windows desktop application built with **Tauri 2, Rust, and React** that inspects installed Electron apps and developer tools for:
 
 - **Hidden telemetry endpoints** (PostHog, Axiom OTLP, Sentry, Segment, Mixpanel, Amplitude, Datadog, `ingest.*`, `telemetry.*`)

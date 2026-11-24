@@ -15,6 +15,13 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import {
+  detectInitialLocale,
+  MESSAGES,
+  translateCredDescription,
+  type Locale,
+  type Messages,
+} from "./i18n";
 import type {
   ActionResult,
   AppScanResult,
@@ -52,6 +59,9 @@ function riskDotClass(level: AppScanResult["riskLevel"]): string {
 }
 
 export function App() {
+  const [locale, setLocale] = useState<Locale>(detectInitialLocale);
+  const t = MESSAGES[locale];
+
   const [activeTab, setActiveTab] = useState<TabId>("scanner");
   const [report, setReport] = useState<ScanReport | null>(null);
   const [selectedAppName, setSelectedAppName] = useState<string | null>(null);
@@ -66,6 +76,11 @@ export function App() {
     null
   );
   const [busyAction, setBusyAction] = useState<string | null>(null);
+
+  const switchLocale = useCallback((next: Locale) => {
+    setLocale(next);
+    window.localStorage.setItem("sentinel-guard-locale", next);
+  }, []);
 
   const showToast = useCallback((ok: boolean, text: string) => {
     setToast({ ok, text });
@@ -87,12 +102,12 @@ export function App() {
           return res.apps[0]?.appName ?? null;
         });
       } catch (err) {
-        showToast(false, `スキャン失敗: ${String(err)}`);
+        showToast(false, MESSAGES[locale].scanFailed(String(err)));
       } finally {
         setScanning(false);
       }
     },
-    [showToast]
+    [locale, showToast]
   );
 
   const refreshLive = useCallback(async () => {
@@ -101,11 +116,21 @@ export function App() {
       const snap = await invoke<LiveSnapshot>("get_live_snapshot");
       setLive(snap);
     } catch (err) {
-      showToast(false, `ライブ監視更新エラー: ${String(err)}`);
+      showToast(false, MESSAGES[locale].liveFailed(String(err)));
     } finally {
       setLiveLoading(false);
     }
-  }, [showToast]);
+  }, [locale, showToast]);
+
+  useEffect(() => {
+    void invoke<string | null>("get_initial_locale")
+      .then((envLang) => {
+        if (envLang === "en" || envLang === "ja") {
+          setLocale(envLang);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     void runScan();
@@ -120,7 +145,6 @@ export function App() {
     return () => window.clearInterval(id);
   }, [autoRefresh, refreshLive]);
 
-  // Keyboard shortcut: R to rescan when not typing in an input
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName;
@@ -128,6 +152,12 @@ export function App() {
       if (e.key.toLowerCase() === "r" && !e.ctrlKey && !e.metaKey && !scanning) {
         void runScan(customPath.trim() ? [customPath.trim()] : undefined);
         void refreshLive();
+      } else if (e.key.toLowerCase() === "l" && !e.ctrlKey && !e.metaKey) {
+        setLocale((prev) => {
+          const next = prev === "ja" ? "en" : "ja";
+          window.localStorage.setItem("sentinel-guard-locale", next);
+          return next;
+        });
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -205,10 +235,10 @@ export function App() {
 
   const pageTitle =
     activeTab === "scanner"
-      ? "アプリ静的スキャン"
+      ? t.titleScanner
       : activeTab === "live"
-      ? "ライブ通信監視"
-      : "機密ファイル保護対象";
+      ? t.titleLive
+      : t.titleVault;
 
   const appWindow = useMemo(() => getCurrentWindow(), []);
 
@@ -229,411 +259,377 @@ export function App() {
           </span>
         </div>
 
-        <div className="titlebar-controls">
-          <button
-            type="button"
-            className="win-btn"
-            onClick={() => void appWindow.minimize()}
-            title="最小化"
-            aria-label="最小化"
-          >
-            <Minus size={14} strokeWidth={1.5} />
-          </button>
-          <button
-            type="button"
-            className="win-btn"
-            onClick={() => void appWindow.toggleMaximize()}
-            title="最大化 / 元に戻す"
-            aria-label="最大化"
-          >
-            <Square size={12} strokeWidth={1.5} />
-          </button>
-          <button
-            type="button"
-            className="win-btn close"
-            onClick={() => void appWindow.hide()}
-            title="トレイに格納"
-            aria-label="トレイに格納"
-          >
-            <X size={14} strokeWidth={1.5} />
-          </button>
+        <div className="titlebar-right">
+          <div className="lang-switch" role="group" aria-label="Language">
+            <button
+              type="button"
+              className={`lang-btn ${locale === "en" ? "active" : ""}`}
+              onClick={() => switchLocale("en")}
+            >
+              EN
+            </button>
+            <button
+              type="button"
+              className={`lang-btn ${locale === "ja" ? "active" : ""}`}
+              onClick={() => switchLocale("ja")}
+            >
+              JA
+            </button>
+          </div>
+
+          <div className="titlebar-controls">
+            <button
+              type="button"
+              className="win-btn"
+              onClick={() => void appWindow.minimize()}
+              title={t.winMinimize}
+              aria-label={t.winMinimize}
+            >
+              <Minus size={14} strokeWidth={1.5} />
+            </button>
+            <button
+              type="button"
+              className="win-btn"
+              onClick={() => void appWindow.toggleMaximize()}
+              title={t.winMaximize}
+              aria-label={t.winMaximize}
+            >
+              <Square size={12} strokeWidth={1.5} />
+            </button>
+            <button
+              type="button"
+              className="win-btn close"
+              onClick={() => void appWindow.hide()}
+              title={t.winHideToTray}
+              aria-label={t.winHideToTray}
+            >
+              <X size={14} strokeWidth={1.5} />
+            </button>
+          </div>
         </div>
       </div>
 
       <div className="shell">
-      {/* Sidebar */}
-      <aside className="sidebar">
-        <div className="brand">
-          <div className="brand-mark">
-            <Shield size={ICON_SIZE} strokeWidth={ICON_STROKE} />
-          </div>
-          <div>
-            <div className="brand-title">Sentinel Guard</div>
-            <div className="brand-sub">Telemetry &amp; Privacy Watch</div>
-          </div>
-        </div>
-
-        <nav className="nav-group">
-          <div className="sidebar-label">監視ビュー</div>
-          <button
-            className={`nav-item ${activeTab === "scanner" ? "active" : ""}`}
-            onClick={() => setActiveTab("scanner")}
-          >
-            <FolderSearch size={ICON_SIZE} strokeWidth={ICON_STROKE} />
-            <span>アプリ静的スキャン</span>
-            {report && (
-              <span
-                className={`nav-count ${
-                  report.highRiskCount > 0 ? "danger" : ""
-                }`}
-              >
-                {report.highRiskCount}
-              </span>
-            )}
-          </button>
-
-          <button
-            className={`nav-item ${activeTab === "live" ? "active" : ""}`}
-            onClick={() => setActiveTab("live")}
-          >
-            <Activity size={ICON_SIZE} strokeWidth={ICON_STROKE} />
-            <span>ライブ監視</span>
-            <span className={`nav-count ${liveAlertCount > 0 ? "warn" : ""}`}>
-              {liveAlertCount}
-            </span>
-          </button>
-
-          <button
-            className={`nav-item ${activeTab === "vault" ? "active" : ""}`}
-            onClick={() => setActiveTab("vault")}
-          >
-            <KeyRound size={ICON_SIZE} strokeWidth={ICON_STROKE} />
-            <span>機密ファイル対象</span>
-            <span className="nav-count">
-              {live?.sensitiveFiles.filter((f) => f.exists).length ?? 0}
-            </span>
-          </button>
-        </nav>
-
-        <div className="sidebar-section">
-          <div className="sidebar-label">対象フォルダ</div>
-          <form className="custom-scan-form" onSubmit={handleCustomScan}>
-            <input
-              type="text"
-              value={customPath}
-              onChange={(e) => setCustomPath(e.target.value)}
-              placeholder="空欄で Programs 全体"
-            />
-            <button type="submit" className="btn" disabled={scanning}>
-              {scanning ? "走査中" : "フォルダをスキャン"}
-            </button>
-          </form>
-        </div>
-
-        <div className="sidebar-footer">
-          <div className="tray-status">
-            <span className="dot ok" />
-            <span>トレイ常駐待機中</span>
-          </div>
-          <div className="tray-hint">閉じるで格納 · 右クリックで終了</div>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <main className="main">
-        <header className="topbar">
-          <div className="page-heading">
-            <h1>{pageTitle}</h1>
-            {report && (
-              <span className="mono muted">
-                {report.durationMs} ms · {report.scannedAt}
-              </span>
-            )}
+        {/* Sidebar */}
+        <aside className="sidebar">
+          <div className="brand">
+            <div className="brand-mark">
+              <Shield size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+            </div>
+            <div>
+              <div className="brand-title">Sentinel Guard</div>
+              <div className="brand-sub">Telemetry &amp; Privacy Watch</div>
+            </div>
           </div>
 
-          <div className="topbar-actions">
-            <span className="keycap" title="ショートカット: R">
-              R
-            </span>
+          <nav className="nav-group">
+            <div className="sidebar-label">{t.watchViews}</div>
             <button
-              className="btn primary"
-              onClick={() => {
-                void runScan(
-                  customPath.trim() ? [customPath.trim()] : undefined
-                );
-                void refreshLive();
-              }}
-              disabled={scanning}
+              className={`nav-item ${activeTab === "scanner" ? "active" : ""}`}
+              onClick={() => setActiveTab("scanner")}
             >
-              <RefreshCw
-                size={ICON_SIZE}
-                strokeWidth={ICON_STROKE}
-                className={scanning ? "spin" : ""}
-              />
-              <span>{scanning ? "スキャン中" : "再スキャン"}</span>
+              <FolderSearch size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+              <span>{t.navScanner}</span>
+              {report && (
+                <span
+                  className={`nav-count ${
+                    report.highRiskCount > 0 ? "danger" : ""
+                  }`}
+                >
+                  {report.highRiskCount}
+                </span>
+              )}
             </button>
-          </div>
-        </header>
 
-        {/* Compact Stat Row */}
-        <section className="metrics">
-          <div className="metric-card">
-            <span className="metric-label">スキャン済みアプリ</span>
-            <div className="metric-value-row">
-              <span className="metric-value">{report?.totalApps ?? "—"}</span>
-              <span className="metric-sub">Apps</span>
-            </div>
-          </div>
-          <div className="metric-card">
-            <span className="metric-label">高リスク検出</span>
-            <div className="metric-value-row">
+            <button
+              className={`nav-item ${activeTab === "live" ? "active" : ""}`}
+              onClick={() => setActiveTab("live")}
+            >
+              <Activity size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+              <span>{t.navLive}</span>
               <span
-                className={`metric-value ${
-                  (report?.highRiskCount ?? 0) > 0 ? "danger" : ""
-                }`}
-              >
-                {report?.highRiskCount ?? 0}
-              </span>
-              <span className="metric-sub">越境・送信</span>
-            </div>
-          </div>
-          <div className="metric-card">
-            <span className="metric-label">中リスク検出</span>
-            <div className="metric-value-row">
-              <span
-                className={`metric-value ${
-                  (report?.mediumRiskCount ?? 0) > 0 ? "warn" : ""
-                }`}
-              >
-                {report?.mediumRiskCount ?? 0}
-              </span>
-              <span className="metric-sub">テレメトリのみ</span>
-            </div>
-          </div>
-          <div className="metric-card">
-            <span className="metric-label">ライブ検知イベント</span>
-            <div className="metric-value-row">
-              <span
-                className={`metric-value ${liveAlertCount > 0 ? "danger" : ""}`}
+                className={`nav-count ${liveAlertCount > 0 ? "warn" : ""}`}
               >
                 {liveAlertCount}
               </span>
-              <span className="metric-sub">
-                TCP {live?.activeConnections.length ?? 0}
+            </button>
+
+            <button
+              className={`nav-item ${activeTab === "vault" ? "active" : ""}`}
+              onClick={() => setActiveTab("vault")}
+            >
+              <KeyRound size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+              <span>{t.navVault}</span>
+              <span className="nav-count">
+                {live?.sensitiveFiles.filter((f) => f.exists).length ?? 0}
               </span>
+            </button>
+          </nav>
+
+          <div className="sidebar-section">
+            <div className="sidebar-label">{t.targetFolder}</div>
+            <form className="custom-scan-form" onSubmit={handleCustomScan}>
+              <input
+                type="text"
+                value={customPath}
+                onChange={(e) => setCustomPath(e.target.value)}
+                placeholder={t.targetPlaceholder}
+              />
+              <button type="submit" className="btn" disabled={scanning}>
+                {scanning ? t.scanningBtn : t.scanFolderBtn}
+              </button>
+            </form>
+          </div>
+
+          <div className="sidebar-footer">
+            <div className="tray-status">
+              <span className="dot ok" />
+              <span>{t.trayStatus}</span>
             </div>
+            <div className="tray-hint">{t.trayHint}</div>
           </div>
-        </section>
+        </aside>
 
-        {toast && (
-          <div className={`toast ${toast.ok ? "ok" : "err"}`}>
-            {toast.ok ? (
-              <CheckCircle2 size={ICON_SIZE} strokeWidth={ICON_STROKE} />
-            ) : (
-              <AlertTriangle size={ICON_SIZE} strokeWidth={ICON_STROKE} />
-            )}
-            <span>{toast.text}</span>
-          </div>
-        )}
-
-        {/* TAB 1: Static App Scanner */}
-        {activeTab === "scanner" && (
-          <section className="split-view">
-            {/* App List */}
-            <div className="panel">
-              <div className="panel-header">
-                <h2>検出アプリ</h2>
+        {/* Main Content */}
+        <main className="main">
+          <header className="topbar">
+            <div className="page-heading">
+              <h1>{pageTitle}</h1>
+              {report && (
                 <span className="mono muted">
-                  {report ? `${report.apps.length} 件` : "—"}
+                  {report.durationMs} ms · {report.scannedAt}
                 </span>
-              </div>
-
-              <div className="app-list">
-                {!report && scanning && (
-                  <div className="empty-state">
-                    インストール済みアプリのバンドルを解析中
-                  </div>
-                )}
-                {report && report.apps.length === 0 && (
-                  <div className="empty-state">
-                    スキャン対象のアプリが見つかりませんでした
-                  </div>
-                )}
-                {report?.apps.map((app) => {
-                  const isSelected = app.appName === selectedAppName;
-                  const crossCount = app.credentialRefs.filter(
-                    (c) => c.isCrossTool
-                  ).length;
-                  return (
-                    <button
-                      key={app.installDir}
-                      className={`app-row ${isSelected ? "selected" : ""}`}
-                      onClick={() => setSelectedAppName(app.appName)}
-                    >
-                      <div className="app-row-top">
-                        <div className="app-name-wrap">
-                          <span
-                            className={`dot ${riskDotClass(app.riskLevel)}`}
-                          />
-                          <span className="app-name">{app.appName}</span>
-                        </div>
-                        <span
-                          className={`app-score ${app.riskLevel.toLowerCase()}`}
-                        >
-                          {app.riskScore}
-                        </span>
-                      </div>
-                      <div className="app-row-meta">
-                        <span>送信先 {app.telemetryEndpoints.length}</span>
-                        {crossCount > 0 && (
-                          <span className="meta-alert">
-                            越境 {crossCount}
-                          </span>
-                        )}
-                        <span>{formatBytes(app.totalBytesScanned)}</span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* App Details */}
-            <div className="panel">
-              {!selectedApp ? (
-                <div className="empty-state">
-                  左のリストからアプリを選択してください
-                </div>
-              ) : (
-                <AppDetailView
-                  app={selectedApp}
-                  busyAction={busyAction}
-                  onApplyEnv={handleApplyEnv}
-                  onRemoveEnv={handleRemoveEnv}
-                  onBlockDomains={handleBlockDomains}
-                />
               )}
             </div>
-          </section>
-        )}
 
-        {/* TAB 2: Live Monitor */}
-        {activeTab === "live" && (
-          <section className="single-scroll">
-            <div className="panel">
-              <div className="panel-header">
-                <div>
-                  <h2>アクティブ外部通信 (HTTPS / OTLP)</h2>
-                </div>
-                <div className="inline-actions">
-                  <label className="toggle-label">
-                    <input
-                      type="checkbox"
-                      checked={autoRefresh}
-                      onChange={(e) => setAutoRefresh(e.target.checked)}
-                    />
-                    <span>10秒自動更新</span>
-                  </label>
-                  <button
-                    className="btn-xs"
-                    onClick={() => void refreshLive()}
-                    disabled={liveLoading}
-                  >
-                    <RefreshCw
-                      size={14}
-                      strokeWidth={ICON_STROKE}
-                      className={liveLoading ? "spin" : ""}
-                    />
-                    <span>更新</span>
-                  </button>
-                </div>
-              </div>
+            <div className="topbar-actions">
+              <span className="keycap" title={t.shortcutHint}>
+                R
+              </span>
+              <button
+                className="btn primary"
+                onClick={() => {
+                  void runScan(
+                    customPath.trim() ? [customPath.trim()] : undefined
+                  );
+                  void refreshLive();
+                }}
+                disabled={scanning}
+              >
+                <RefreshCw
+                  size={ICON_SIZE}
+                  strokeWidth={ICON_STROKE}
+                  className={scanning ? "spin" : ""}
+                />
+                <span>{scanning ? t.rescanning : t.rescan}</span>
+              </button>
+            </div>
+          </header>
 
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>プロセス</th>
-                      <th>PID</th>
-                      <th>接続先 IP</th>
-                      <th>ポート</th>
-                      <th>テレメトリ判定</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {live?.activeConnections.map((c, idx) => (
-                      <tr
-                        key={`${c.pid}-${c.remoteAddress}-${idx}`}
-                        className={c.telemetryDomain ? "row-alert" : ""}
-                      >
-                        <td>{c.processName}</td>
-                        <td className="mono muted">{c.pid}</td>
-                        <td className="mono">{c.remoteAddress}</td>
-                        <td className="mono muted">{c.remotePort}</td>
-                        <td>
-                          {c.telemetryDomain ? (
-                            <span className="status-tag danger">
-                              {c.telemetryVendor} · {c.telemetryDomain}
-                            </span>
-                          ) : (
-                            <span className="muted">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          {/* Compact Stat Row */}
+          <section className="metrics">
+            <div className="metric-card">
+              <span className="metric-label">{t.metricScanned}</span>
+              <div className="metric-value-row">
+                <span className="metric-value">
+                  {report?.totalApps ?? "—"}
+                </span>
+                <span className="metric-sub">Apps</span>
               </div>
             </div>
-
-            <div className="panel">
-              <div className="panel-header">
-                <h2>DNS キャッシュ・テレメトリ履歴</h2>
-                <span className="mono muted">
-                  {live?.timestamp ?? "—"} · {live?.dnsTotalEntries ?? 0} 件
+            <div className="metric-card">
+              <span className="metric-label">{t.metricHigh}</span>
+              <div className="metric-value-row">
+                <span
+                  className={`metric-value ${
+                    (report?.highRiskCount ?? 0) > 0 ? "danger" : ""
+                  }`}
+                >
+                  {report?.highRiskCount ?? 0}
+                </span>
+                <span className="metric-sub">{t.metricHighSub}</span>
+              </div>
+            </div>
+            <div className="metric-card">
+              <span className="metric-label">{t.metricMedium}</span>
+              <div className="metric-value-row">
+                <span
+                  className={`metric-value ${
+                    (report?.mediumRiskCount ?? 0) > 0 ? "warn" : ""
+                  }`}
+                >
+                  {report?.mediumRiskCount ?? 0}
+                </span>
+                <span className="metric-sub">{t.metricMediumSub}</span>
+              </div>
+            </div>
+            <div className="metric-card">
+              <span className="metric-label">{t.metricLive}</span>
+              <div className="metric-value-row">
+                <span
+                  className={`metric-value ${
+                    liveAlertCount > 0 ? "danger" : ""
+                  }`}
+                >
+                  {liveAlertCount}
+                </span>
+                <span className="metric-sub">
+                  TCP {live?.activeConnections.length ?? 0}
                 </span>
               </div>
+            </div>
+          </section>
 
-              {!live || live.dnsTelemetryHits.length === 0 ? (
-                <div className="quiet-box">
-                  <span className="dot ok" />
-                  <span>
-                    DNS キャッシュ上にテレメトリドメインの直近解決履歴はありません
+          {toast && (
+            <div className={`toast ${toast.ok ? "ok" : "err"}`}>
+              {toast.ok ? (
+                <CheckCircle2 size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+              ) : (
+                <AlertTriangle size={ICON_SIZE} strokeWidth={ICON_STROKE} />
+              )}
+              <span>{toast.text}</span>
+            </div>
+          )}
+
+          {/* TAB 1: Static App Scanner */}
+          {activeTab === "scanner" && (
+            <section className="split-view">
+              {/* App List */}
+              <div className="panel">
+                <div className="panel-header">
+                  <h2>{t.detectedApps}</h2>
+                  <span className="mono muted">
+                    {report ? t.countUnit(report.apps.length) : "—"}
                   </span>
                 </div>
-              ) : (
+
+                <div className="app-list">
+                  {!report && scanning && (
+                    <div className="empty-state">{t.scanningEmpty}</div>
+                  )}
+                  {report && report.apps.length === 0 && (
+                    <div className="empty-state">{t.noAppsEmpty}</div>
+                  )}
+                  {report?.apps.map((app) => {
+                    const isSelected = app.appName === selectedAppName;
+                    const crossCount = app.credentialRefs.filter(
+                      (c) => c.isCrossTool
+                    ).length;
+                    return (
+                      <button
+                        key={app.installDir}
+                        className={`app-row ${isSelected ? "selected" : ""}`}
+                        onClick={() => setSelectedAppName(app.appName)}
+                      >
+                        <div className="app-row-top">
+                          <div className="app-name-wrap">
+                            <span
+                              className={`dot ${riskDotClass(app.riskLevel)}`}
+                            />
+                            <span className="app-name">{app.appName}</span>
+                          </div>
+                          <span
+                            className={`app-score ${app.riskLevel.toLowerCase()}`}
+                          >
+                            {app.riskScore}
+                          </span>
+                        </div>
+                        <div className="app-row-meta">
+                          <span>
+                            {t.endpointsShort(app.telemetryEndpoints.length)}
+                          </span>
+                          {crossCount > 0 && (
+                            <span className="meta-alert">
+                              {t.crossToolShort(crossCount)}
+                            </span>
+                          )}
+                          <span>{formatBytes(app.totalBytesScanned)}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* App Details */}
+              <div className="panel">
+                {!selectedApp ? (
+                  <div className="empty-state">{t.selectAppEmpty}</div>
+                ) : (
+                  <AppDetailView
+                    app={selectedApp}
+                    locale={locale}
+                    t={t}
+                    busyAction={busyAction}
+                    onApplyEnv={handleApplyEnv}
+                    onRemoveEnv={handleRemoveEnv}
+                    onBlockDomains={handleBlockDomains}
+                  />
+                )}
+              </div>
+            </section>
+          )}
+
+          {/* TAB 2: Live Monitor */}
+          {activeTab === "live" && (
+            <section className="single-scroll">
+              <div className="panel">
+                <div className="panel-header">
+                  <div>
+                    <h2>{t.liveTcpTitle}</h2>
+                  </div>
+                  <div className="inline-actions">
+                    <label className="toggle-label">
+                      <input
+                        type="checkbox"
+                        checked={autoRefresh}
+                        onChange={(e) => setAutoRefresh(e.target.checked)}
+                      />
+                      <span>{t.autoRefresh10s}</span>
+                    </label>
+                    <button
+                      className="btn-xs"
+                      onClick={() => void refreshLive()}
+                      disabled={liveLoading}
+                    >
+                      <RefreshCw
+                        size={14}
+                        strokeWidth={ICON_STROKE}
+                        className={liveLoading ? "spin" : ""}
+                      />
+                      <span>{t.btnRefresh}</span>
+                    </button>
+                  </div>
+                </div>
+
                 <div className="table-wrap">
                   <table>
                     <thead>
                       <tr>
-                        <th>ドメイン</th>
-                        <th>種別</th>
-                        <th>解決先</th>
-                        <th>TTL</th>
-                        <th>状態</th>
+                        <th>{t.thProcess}</th>
+                        <th>{t.thPid}</th>
+                        <th>{t.thRemoteIp}</th>
+                        <th>{t.thPort}</th>
+                        <th>{t.thTelemetry}</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {live.dnsTelemetryHits.map((hit) => (
-                        <tr key={`${hit.domain}-${hit.data}`}>
-                          <td className="mono">{hit.domain}</td>
-                          <td className="secondary">
-                            {hit.matchedVendor ?? "Telemetry"}
-                          </td>
-                          <td className="mono muted">{hit.data}</td>
-                          <td className="mono muted">{hit.ttl}s</td>
+                      {live?.activeConnections.map((c, idx) => (
+                        <tr
+                          key={`${c.pid}-${c.remoteAddress}-${idx}`}
+                          className={c.telemetryDomain ? "row-alert" : ""}
+                        >
+                          <td>{c.processName}</td>
+                          <td className="mono muted">{c.pid}</td>
+                          <td className="mono">{c.remoteAddress}</td>
+                          <td className="mono muted">{c.remotePort}</td>
                           <td>
-                            {hit.isBlockedInHosts ? (
-                              <span className="status-tag ok">ブロック済</span>
+                            {c.telemetryDomain ? (
+                              <span className="status-tag danger">
+                                {c.telemetryVendor} · {c.telemetryDomain}
+                              </span>
                             ) : (
-                              <button
-                                className="btn-xs danger"
-                                onClick={() =>
-                                  void handleBlockDomains([hit.domain])
-                                }
-                              >
-                                ブロック
-                              </button>
+                              <span className="muted">—</span>
                             )}
                           </td>
                         </tr>
@@ -641,60 +637,124 @@ export function App() {
                     </tbody>
                   </table>
                 </div>
-              )}
-            </div>
-          </section>
-        )}
+              </div>
 
-        {/* TAB 3: Sensitive Credential Vault Watch */}
-        {activeTab === "vault" && (
-          <section className="single-scroll">
-            <div className="panel">
-              <div className="panel-header">
-                <h2>越境アクセス監視対象の機密ファイル</h2>
-                <span className="mono muted">
-                  {live?.sensitiveFiles.filter((f) => f.exists).length ?? 0} /{" "}
-                  {live?.sensitiveFiles.length ?? 0} 存在
-                </span>
+              <div className="panel">
+                <div className="panel-header">
+                  <h2>{t.liveDnsTitle}</h2>
+                  <span className="mono muted">
+                    {live?.timestamp ?? "—"} ·{" "}
+                    {t.countUnit(live?.dnsTotalEntries ?? 0)}
+                  </span>
+                </div>
+
+                {!live || live.dnsTelemetryHits.length === 0 ? (
+                  <div className="quiet-box">
+                    <span className="dot ok" />
+                    <span>{t.noDnsHits}</span>
+                  </div>
+                ) : (
+                  <div className="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>{t.thDomain}</th>
+                          <th>{t.thVendor}</th>
+                          <th>{t.thResolved}</th>
+                          <th>{t.thTtl}</th>
+                          <th>{t.thStatus}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {live.dnsTelemetryHits.map((hit) => (
+                          <tr key={`${hit.domain}-${hit.data}`}>
+                            <td className="mono">{hit.domain}</td>
+                            <td className="secondary">
+                              {hit.matchedVendor ?? "Telemetry"}
+                            </td>
+                            <td className="mono muted">{hit.data}</td>
+                            <td className="mono muted">{hit.ttl}s</td>
+                            <td>
+                              {hit.isBlockedInHosts ? (
+                                <span className="status-tag ok">
+                                  {t.badgeBlocked}
+                                </span>
+                              ) : (
+                                <button
+                                  className="btn-xs danger"
+                                  onClick={() =>
+                                    void handleBlockDomains([hit.domain])
+                                  }
+                                >
+                                  {t.btnBlock}
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>種別</th>
-                      <th>対象</th>
-                      <th>パス</th>
-                      <th>状態</th>
-                      <th>最終更新</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {live?.sensitiveFiles.map((sf) => (
-                      <tr key={sf.path}>
-                        <td>
-                          <span className="status-tag neutral">
-                            {sf.category}
-                          </span>
-                        </td>
-                        <td>{sf.label}</td>
-                        <td className="mono secondary">{sf.path}</td>
-                        <td>
-                          {sf.exists ? (
-                            <span className="status-tag warn">要保護</span>
-                          ) : (
-                            <span className="muted">未検出</span>
-                          )}
-                        </td>
-                        <td className="mono muted">{sf.modifiedAt ?? "—"}</td>
+            </section>
+          )}
+
+          {/* TAB 3: Sensitive Credential Vault Watch */}
+          {activeTab === "vault" && (
+            <section className="single-scroll">
+              <div className="panel">
+                <div className="panel-header">
+                  <h2>{t.vaultTitle}</h2>
+                  <span className="mono muted">
+                    {t.vaultExistsRatio(
+                      live?.sensitiveFiles.filter((f) => f.exists).length ?? 0,
+                      live?.sensitiveFiles.length ?? 0
+                    )}
+                  </span>
+                </div>
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>{t.thCategory}</th>
+                        <th>{t.thTarget}</th>
+                        <th>{t.thPath}</th>
+                        <th>{t.thState}</th>
+                        <th>{t.thModified}</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {live?.sensitiveFiles.map((sf) => (
+                        <tr key={sf.path}>
+                          <td>
+                            <span className="status-tag neutral">
+                              {sf.category}
+                            </span>
+                          </td>
+                          <td>{sf.label}</td>
+                          <td className="mono secondary">{sf.path}</td>
+                          <td>
+                            {sf.exists ? (
+                              <span className="status-tag warn">
+                                {t.badgeProtectedTarget}
+                              </span>
+                            ) : (
+                              <span className="muted">{t.statusNotFound}</span>
+                            )}
+                          </td>
+                          <td className="mono muted">
+                            {sf.modifiedAt ?? "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
-          </section>
-        )}
-      </main>
+            </section>
+          )}
+        </main>
       </div>
     </div>
   );
@@ -702,6 +762,8 @@ export function App() {
 
 interface AppDetailProps {
   app: AppScanResult;
+  locale: Locale;
+  t: Messages;
   busyAction: string | null;
   onApplyEnv: (name: string, value: string) => Promise<void>;
   onRemoveEnv: (name: string) => Promise<void>;
@@ -710,6 +772,8 @@ interface AppDetailProps {
 
 function AppDetailView({
   app,
+  locale,
+  t,
   busyAction,
   onApplyEnv,
   onRemoveEnv,
@@ -758,7 +822,7 @@ function AppDetailView({
             }
           >
             <Lock size={ICON_SIZE} strokeWidth={ICON_STROKE} />
-            <span>hosts で一括ブロック</span>
+            <span>{t.blockAllHosts}</span>
           </button>
         )}
       </div>
@@ -766,7 +830,7 @@ function AppDetailView({
       {/* Moment: Exposure Profile Precision Meter */}
       <div className="exposure-instrument">
         <div className="exposure-top">
-          <span className="exposure-label">露出スコア (Exposure profile)</span>
+          <span className="exposure-label">{t.exposureScore}</span>
           <div className="exposure-score-readout">
             <span className={`exposure-big ${levelClass}`}>
               {app.riskScore}
@@ -788,27 +852,27 @@ function AppDetailView({
 
         <div className="exposure-breakdown">
           <div className="breakdown-item">
-            <span className="breakdown-label">越境認証ファイル参照</span>
+            <span className="breakdown-label">{t.breakdownCrossTool}</span>
             <span
               className={`breakdown-val ${crossCount > 0 ? "danger" : "ok"}`}
             >
-              {crossCount} 件
+              {crossCount}
             </span>
           </div>
           <div className="breakdown-item">
-            <span className="breakdown-label">未ブロック送信先</span>
+            <span className="breakdown-label">{t.breakdownUnblocked}</span>
             <span
               className={`breakdown-val ${
                 unblockedCount > 0 ? "warn" : "ok"
               }`}
             >
-              {unblockedCount} / {app.telemetryEndpoints.length} 件
+              {unblockedCount} / {app.telemetryEndpoints.length}
             </span>
           </div>
           <div className="breakdown-item">
-            <span className="breakdown-label">オプトアウト環境変数</span>
+            <span className="breakdown-label">{t.breakdownOptOut}</span>
             <span className="breakdown-val">
-              {appliedEnvCount} / {app.optOutEnvVars.length} 適用済
+              {appliedEnvCount} / {app.optOutEnvVars.length} {t.appliedSuffix}
             </span>
           </div>
         </div>
@@ -817,13 +881,13 @@ function AppDetailView({
       {/* Cross-tool Credential References */}
       <div className="detail-block">
         <div className="block-header">
-          <h3>他ツール認証・機密ファイル参照</h3>
-          <span className="mono muted">{app.credentialRefs.length} 件</span>
+          <h3>{t.secCreds}</h3>
+          <span className="mono muted">{app.credentialRefs.length}</span>
         </div>
         {app.credentialRefs.length === 0 ? (
           <div className="quiet-box">
             <span className="dot ok" />
-            <span>他ツール認証ファイルへの参照は検出されませんでした</span>
+            <span>{t.noCredsFound}</span>
           </div>
         ) : (
           <div className="card-stack">
@@ -839,10 +903,16 @@ function AppDetailView({
                       cred.isCrossTool ? "danger" : "neutral"
                     }`}
                   >
-                    {cred.isCrossTool ? "越境アクセス兆候" : "自社ツール参照"}
+                    {cred.isCrossTool ? t.badgeCrossTool : t.badgeSelfTool}
                   </span>
                 </div>
-                <div className="finding-desc">{cred.description}</div>
+                <div className="finding-desc">
+                  {translateCredDescription(
+                    cred.target,
+                    cred.description,
+                    locale
+                  )}
+                </div>
                 <div className="finding-src mono">{cred.sourceFile}</div>
               </div>
             ))}
@@ -853,15 +923,13 @@ function AppDetailView({
       {/* Telemetry Endpoints */}
       <div className="detail-block">
         <div className="block-header">
-          <h3>埋め込みテレメトリ送信先</h3>
-          <span className="mono muted">
-            {app.telemetryEndpoints.length} 件
-          </span>
+          <h3>{t.secEndpoints}</h3>
+          <span className="mono muted">{app.telemetryEndpoints.length}</span>
         </div>
         {app.telemetryEndpoints.length === 0 ? (
           <div className="quiet-box">
             <span className="dot ok" />
-            <span>既知のテレメトリ送信先 URL は検出されませんでした</span>
+            <span>{t.noEndpointsFound}</span>
           </div>
         ) : (
           <div className="card-stack">
@@ -872,14 +940,14 @@ function AppDetailView({
                   <div className="inline-actions">
                     <span className="status-tag neutral">{ep.vendor}</span>
                     {ep.isBlockedInHosts ? (
-                      <span className="status-tag ok">ブロック済</span>
+                      <span className="status-tag ok">{t.badgeBlocked}</span>
                     ) : (
                       <button
                         className="btn-xs danger"
                         disabled={busyAction !== null}
                         onClick={() => void onBlockDomains([ep.domain])}
                       >
-                        ブロック
+                        {t.btnBlock}
                       </button>
                     )}
                   </div>
@@ -895,12 +963,12 @@ function AppDetailView({
       {/* Opt-out Environment Variables */}
       <div className="detail-block">
         <div className="block-header">
-          <h3>オプトアウト環境変数</h3>
-          <span className="mono muted">{app.optOutEnvVars.length} 件</span>
+          <h3>{t.secEnvVars}</h3>
+          <span className="mono muted">{app.optOutEnvVars.length}</span>
         </div>
         {app.optOutEnvVars.length === 0 ? (
           <div className="quiet-box">
-            <span>明確なオプトアウト環境変数は見つかりませんでした</span>
+            <span>{t.noEnvVarsFound}</span>
           </div>
         ) : (
           <div className="card-stack">
@@ -911,21 +979,21 @@ function AppDetailView({
                     {ev.name}={ev.recommendedValue}
                   </div>
                   <div className="muted" style={{ fontSize: "12px" }}>
-                    現在値:{" "}
+                    {t.currentValLabel}{" "}
                     <span className="mono">
-                      {ev.currentValue ?? "(未設定)"}
+                      {ev.currentValue ?? t.unsetVal}
                     </span>
                   </div>
                 </div>
                 <div className="inline-actions">
                   {ev.isApplied ? (
                     <>
-                      <span className="status-tag ok">適用済</span>
+                      <span className="status-tag ok">{t.badgeApplied}</span>
                       <button
                         className="btn-xs ghost"
                         disabled={busyAction !== null}
                         onClick={() => void onRemoveEnv(ev.name)}
-                        title="環境変数を削除"
+                        title={t.btnRemoveEnvTitle}
                       >
                         <Trash2 size={14} strokeWidth={ICON_STROKE} />
                       </button>
@@ -938,7 +1006,7 @@ function AppDetailView({
                         void onApplyEnv(ev.name, ev.recommendedValue)
                       }
                     >
-                      適用
+                      {t.btnApply}
                     </button>
                   )}
                 </div>
